@@ -24,7 +24,9 @@ package org.wildfly.extension.undertow.security;
 
 import io.undertow.server.HttpServerExchange;
 import io.undertow.servlet.api.ThreadSetupAction;
+import org.jboss.as.security.plugins.CredentialsFlusher;
 import org.jboss.as.security.plugins.SecurityDomainContext;
+import org.jboss.security.CacheableManager;
 import org.jboss.security.SecurityContext;
 import org.jboss.security.SecurityRolesAssociation;
 import org.jboss.security.identity.RoleGroup;
@@ -32,6 +34,7 @@ import org.jboss.security.mapping.MappingContext;
 import org.jboss.security.mapping.MappingManager;
 import org.jboss.security.mapping.MappingType;
 
+import java.security.Principal;
 import java.util.Map;
 import java.util.Set;
 
@@ -44,6 +47,7 @@ import java.util.Set;
 public class SecurityContextThreadSetupAction implements ThreadSetupAction {
 
     private final String securityDomain;
+    private final boolean flushOnSessionInvalidation;
     private final SecurityDomainContext securityDomainContext;
     private final Map<String, Set<String>> principleVsRoleMap;
 
@@ -55,11 +59,11 @@ public class SecurityContextThreadSetupAction implements ThreadSetupAction {
         }
     };
 
-    public SecurityContextThreadSetupAction(final String securityDomain, SecurityDomainContext securityDomainContext, Map<String, Set<String>> principleVsRoleMap) {
+    public SecurityContextThreadSetupAction(final String securityDomain, final boolean flushOnSessionInvalidation, SecurityDomainContext securityDomainContext, Map<String, Set<String>> principleVsRoleMap) {
         this.securityDomain = securityDomain;
+        this.flushOnSessionInvalidation = flushOnSessionInvalidation;
         this.securityDomainContext = securityDomainContext;
         this.principleVsRoleMap = principleVsRoleMap;
-
     }
 
     @Override
@@ -70,6 +74,10 @@ public class SecurityContextThreadSetupAction implements ThreadSetupAction {
         SecurityContext sc = exchange.getAttachment(UndertowSecurityAttachments.SECURITY_CONTEXT_ATTACHMENT);
         if (sc == null) {
             sc = SecurityActions.createSecurityContext(securityDomain);
+            if (flushOnSessionInvalidation && sc.getAuthenticationManager() instanceof CacheableManager) {
+                CredentialsFlusher flusher = new CredentialsFlusher((CacheableManager<?, Principal>) sc.getAuthenticationManager());
+                exchange.getSecurityContext().registerNotificationReceiver(flusher);
+            }
             exchange.putAttachment(UndertowSecurityAttachments.SECURITY_CONTEXT_ATTACHMENT, sc);
         }
         SecurityActions.setSecurityContextOnAssociation(sc);

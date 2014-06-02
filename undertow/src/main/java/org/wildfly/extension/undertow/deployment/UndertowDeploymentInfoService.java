@@ -828,9 +828,10 @@ public class UndertowDeploymentInfoService implements Service<DeploymentInfo> {
 
             d.addSecurityRoles(mergedMetaData.getSecurityRoleNames());
 
+            final boolean flushOnSessionInvalidation = mergedMetaData.isFlushOnSessionInvalidation();
 
             Map<String, Set<String>> principalVersusRolesMap = mergedMetaData.getPrincipalVersusRolesMap();
-            d.addThreadSetupAction(new SecurityContextThreadSetupAction(securityDomain, securityDomainContextValue.getValue(), principalVersusRolesMap));
+            d.addThreadSetupAction(new SecurityContextThreadSetupAction(securityDomain, flushOnSessionInvalidation, securityDomainContextValue.getValue(), principalVersusRolesMap));
             d.addInnerHandlerChainWrapper(SecurityContextAssociationHandler.wrapper(mergedMetaData.getRunAsIdentity()));
             d.addOuterHandlerChainWrapper(JACCContextIdHandler.wrapper(jaccContextId));
 
